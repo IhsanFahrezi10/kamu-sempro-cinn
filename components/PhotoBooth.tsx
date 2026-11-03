@@ -1,20 +1,41 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Cropper from "react-easy-crop";
 import EditorialSection from "./EditorialSection";
 
 type Status = "idle" | "requesting" | "ready" | "capturing" | "captured" | "error";
+type Mode = "camera" | "upload";
+
+type CropModal = {
+  slotIndex: number;
+  imageSrc: string;
+};
+
+const ASPECT = 4 / 3;
 
 export default function PhotoBooth() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [mode, setMode] = useState<Mode>("camera");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<(string | null)[]>([null, null, null]);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
+
+  // Upload + crop states
+  const [pendingSlot, setPendingSlot] = useState<number>(0);
+  const [cropModal, setCropModal] = useState<CropModal | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [savingCrop, setSavingCrop] = useState(false);
+
+  const photoCount = photos.filter(Boolean).length;
 
   useEffect(() => {
     return () => {
@@ -23,6 +44,16 @@ export default function PhotoBooth() {
       }
     };
   }, []);
+
+  const handleModeChange = (newMode: Mode) => {
+    if (newMode === mode) return;
+    stopCamera();
+    setMode(newMode);
+    setPhotos([null, null, null]);
+    setStatus("idle");
+    setErrorMsg("");
+    setCountdown(null);
+  };
 
   const startCamera = async () => {
     setStatus("requesting");
@@ -55,13 +86,13 @@ export default function PhotoBooth() {
     }
   };
 
-  // ✅ Capture 4:3 landscape (1200×900)
+  // Capture 4:3 landscape
   const capturePhoto = (): string | null => {
     if (!videoRef.current || !canvasRef.current) return null;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const W = 1200;
-    const H = 900; // 4:3 landscape
+    const H = 900;
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext("2d");
@@ -69,7 +100,7 @@ export default function PhotoBooth() {
 
     const vw = video.videoWidth || 640;
     const vh = video.videoHeight || 480;
-    const targetAspect = W / H; // 1.333
+    const targetAspect = W / H;
 
     let sw = vw;
     let sh = vh;
@@ -86,7 +117,6 @@ export default function PhotoBooth() {
       sy = (vh - sh) / 2;
     }
 
-    // Mirror output
     ctx.save();
     ctx.translate(W, 0);
     ctx.scale(-1, 1);
@@ -98,9 +128,9 @@ export default function PhotoBooth() {
 
   const takePhotos = async () => {
     if (!streamRef.current) return;
-    setPhotos([]);
+    setPhotos([null, null, null]);
     setStatus("capturing");
-    const shots: string[] = [];
+    const shots: (string | null)[] = [null, null, null];
 
     for (let i = 0; i < 3; i++) {
       for (let c = 3; c > 0; c--) {
@@ -113,7 +143,7 @@ export default function PhotoBooth() {
       const photo = capturePhoto();
       setFlash(false);
       if (photo) {
-        shots.push(photo);
+        shots[i] = photo;
         setPhotos([...shots]);
       }
       await new Promise((r) => setTimeout(r, 500));
@@ -123,6 +153,86 @@ export default function PhotoBooth() {
     setStatus("captured");
   };
 
+  // ===== UPLOAD / CROP =====
+  const handleSlotClick = (index: number) => {
+    setPendingSlot(index);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Pilih file gambar ya (jpg/png/webp)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropModal({
+        slotIndex: pendingSlot,
+        imageSrc: reader.result as string,
+      });
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setCroppedAreaPixels(null);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const createImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.addEventListener("load", () => resolve(img));
+      img.addEventListener("error", reject);
+      img.src = url;
+    });
+
+  const getCroppedImg = async (imageSrc: string, pixelCrop: any): Promise<string> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("No 2d context");
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+    ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height);
+    return canvas.toDataURL("image/jpeg", 0.9);
+  };
+
+  const handleCropSave = async () => {
+    if (!cropModal || !croppedAreaPixels) return;
+    setSavingCrop(true);
+    try {
+      const croppedImage = await getCroppedImg(cropModal.imageSrc, croppedAreaPixels);
+      setPhotos((prev) => {
+        const next = [...prev];
+        next[cropModal.slotIndex] = croppedImage;
+        return next;
+      });
+      setCropModal(null);
+    } catch (err) {
+      console.error("Gagal crop:", err);
+    } finally {
+      setSavingCrop(false);
+    }
+  };
+
+  const handleCropCancel = () => {
+    setCropModal(null);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+  };
+
+  const handleRemoveSlot = (index: number) => {
+    setPhotos((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+  };
+
+  // ===== STRIP RENDER (sama kayak sebelumnya) =====
   const loadImage = (src: string): Promise<HTMLImageElement> =>
     new Promise((resolve, reject) => {
       const img = new Image();
@@ -151,7 +261,6 @@ export default function PhotoBooth() {
     ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
   };
 
-  // 🎨 Draw decorations di margin kiri-kanan tiap card
   const drawMarginDecorations = (ctx: CanvasRenderingContext2D, cardIndex: number, cy: number, W: number, CARD_X: number, CARD_W: number, CARD_H: number) => {
     type Decor = { emoji: string; x: number; y: number; size: number; rotate: number };
 
@@ -161,9 +270,7 @@ export default function PhotoBooth() {
     const rightMarginEnd = W - 30;
 
     const pickX = (side: "left" | "right", pct: number) => {
-      if (side === "left") {
-        return leftMarginStart + (leftMarginEnd - leftMarginStart) * pct;
-      }
+      if (side === "left") return leftMarginStart + (leftMarginEnd - leftMarginStart) * pct;
       return rightMarginStart + (rightMarginEnd - rightMarginStart) * pct;
     };
 
@@ -224,14 +331,13 @@ export default function PhotoBooth() {
 
     const set = DECOR_SETS[cardIndex % DECOR_SETS.length];
 
-    // Confetti dots background
     const dotColors = ["#FF8FAB", "#FFC1D5", "#F0C979", "#E0C9F0", "#8FA88F"];
-    const leftDots = Array.from({ length: 8 }).map((_, i) => ({
+    const leftDots = Array.from({ length: 8 }).map(() => ({
       x: leftMarginStart + Math.random() * (leftMarginEnd - leftMarginStart),
       y: Math.random() * CARD_H,
       size: 3 + Math.random() * 3,
     }));
-    const rightDots = Array.from({ length: 8 }).map((_, i) => ({
+    const rightDots = Array.from({ length: 8 }).map(() => ({
       x: rightMarginStart + Math.random() * (rightMarginEnd - rightMarginStart),
       y: Math.random() * CARD_H,
       size: 3 + Math.random() * 3,
@@ -247,7 +353,6 @@ export default function PhotoBooth() {
     });
     ctx.restore();
 
-    // White sparkle accents
     ctx.save();
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = "#FFFFFF";
@@ -258,7 +363,6 @@ export default function PhotoBooth() {
     });
     ctx.restore();
 
-    // Emoji left
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     set.left.forEach((d) => {
@@ -270,8 +374,6 @@ export default function PhotoBooth() {
       ctx.fillText(d.emoji, 0, 0);
       ctx.restore();
     });
-
-    // Emoji right
     set.right.forEach((d) => {
       ctx.save();
       ctx.globalAlpha = 0.8;
@@ -284,21 +386,21 @@ export default function PhotoBooth() {
   };
 
   const downloadStrip = async () => {
-    if (photos.length !== 3) return;
+    const validPhotos = photos.filter((p): p is string => !!p);
+    if (validPhotos.length !== 3) return;
     try {
-      const imgs = await Promise.all(photos.map(loadImage));
+      const imgs = await Promise.all(validPhotos.map(loadImage));
 
       const W = 1080;
       const H = 1920;
       const PAD_TOP = 30;
-      // Card 4:3 landscape
       const CARD_W = 780;
       const CARD_H = 585;
-      const CARD_X = Math.round((W - CARD_W) / 2); // 150
+      const CARD_X = Math.round((W - CARD_W) / 2);
       const GAP = 8;
       const PHOTO_PAD = 16;
-      const PHOTO_W = CARD_W - PHOTO_PAD * 2; // 748
-      const PHOTO_H = CARD_H - PHOTO_PAD * 2; // 553 (aspect 1.353, close enough)
+      const PHOTO_W = CARD_W - PHOTO_PAD * 2;
+      const PHOTO_H = CARD_H - PHOTO_PAD * 2;
 
       const canvas = document.createElement("canvas");
       canvas.width = W;
@@ -306,14 +408,12 @@ export default function PhotoBooth() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Background gradient
       const bg = ctx.createLinearGradient(0, 0, 0, H);
       bg.addColorStop(0, "#FFF9F3");
       bg.addColorStop(1, "#FFE5EC");
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
-      // Outer borders
       const border = ctx.createLinearGradient(0, 0, W, H);
       border.addColorStop(0, "#FF8FAB");
       border.addColorStop(0.5, "#C73E68");
@@ -326,7 +426,6 @@ export default function PhotoBooth() {
       ctx.lineWidth = 2;
       ctx.strokeRect(20, 20, W - 40, H - 40);
 
-      // Corner emojis
       ctx.font = "32px serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -335,34 +434,27 @@ export default function PhotoBooth() {
       ctx.fillText("💖", 42, H - 42);
       ctx.fillText("🌷", W - 42, H - 42);
 
-      // 🎨 Draw decorations behind cards
       for (let i = 0; i < 3; i++) {
         const cy = PAD_TOP + i * (CARD_H + GAP);
         drawMarginDecorations(ctx, i, cy, W, CARD_X, CARD_W, CARD_H);
       }
 
-      // Draw cards
       for (let i = 0; i < 3; i++) {
         const cy = PAD_TOP + i * (CARD_H + GAP);
 
-        // Shadow
         ctx.fillStyle = "rgba(74, 46, 58, 0.12)";
         ctx.fillRect(CARD_X + 3, cy + 3, CARD_W, CARD_H);
 
-        // Card cream
         ctx.fillStyle = "#FFF9F3";
         ctx.fillRect(CARD_X, cy, CARD_W, CARD_H);
 
-        // Photo
         drawCover(ctx, imgs[i], CARD_X + PHOTO_PAD, cy + PHOTO_PAD, PHOTO_W, PHOTO_H);
 
-        // Photo border
         ctx.strokeStyle = "#4A2E3A";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(CARD_X + PHOTO_PAD, cy + PHOTO_PAD, PHOTO_W, PHOTO_H);
       }
 
-      // Signature
       const lastCardEnd = PAD_TOP + 3 * CARD_H + 2 * GAP;
       const sigY = lastCardEnd + 55;
 
@@ -401,7 +493,7 @@ export default function PhotoBooth() {
 
   const reset = () => {
     stopCamera();
-    setPhotos([]);
+    setPhotos([null, null, null]);
     setCountdown(null);
     setStatus("idle");
     setErrorMsg("");
@@ -416,18 +508,37 @@ export default function PhotoBooth() {
           Photo <em className="italic">booth.</em>
         </>
       }
-      subtitle="Aktifin kamera, ambil 3 foto landscape, langsung jadi strip 9:16"
+      subtitle="Foto langsung pakai kamera atau upload dari galeri"
       meta={
         <div className="hidden md:flex flex-col items-end gap-1">
           <span className="stamp">Selfie ✿</span>
-          <span className="font-caveat text-xs text-ink/40 mt-2 tabular-nums">{photos.length}/3</span>
+          <span className="font-caveat text-xs text-ink/40 mt-2 tabular-nums">{photoCount}/3</span>
         </div>
       }
     >
       <canvas ref={canvasRef} className="hidden" />
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+
+      {/* Mode Selector */}
+      <div className="max-w-md mx-auto mb-8">
+        <div className="flex gap-1 p-1 bg-blush rounded-full border-2 border-rose/20">
+          <button
+            onClick={() => handleModeChange("camera")}
+            className={`flex-1 py-3 rounded-full text-xs sm:text-sm font-bold uppercase tracking-wider transition ${mode === "camera" ? "bg-deep-rose text-cream shadow-md" : "text-deep-rose/70 hover:text-deep-rose"}`}
+          >
+            📷 Kamera
+          </button>
+          <button
+            onClick={() => handleModeChange("upload")}
+            className={`flex-1 py-3 rounded-full text-xs sm:text-sm font-bold uppercase tracking-wider transition ${mode === "upload" ? "bg-deep-rose text-cream shadow-md" : "text-deep-rose/70 hover:text-deep-rose"}`}
+          >
+            📤 Upload
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-12 items-start">
-        {/* LEFT: KAMERA */}
+        {/* LEFT: KAMERA / UPLOAD */}
         <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="md:col-span-7 w-full">
           <div className="relative max-w-[560px] mx-auto md:max-w-full">
             <div className="absolute inset-0 rounded-md rotate-1 translate-x-1 translate-y-1 bg-gradient-to-br from-rose via-pink to-lavender" />
@@ -436,75 +547,115 @@ export default function PhotoBooth() {
               <div className="absolute inset-1 rounded-sm border-2 border-rose/40 pointer-events-none z-10" />
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 sm:w-24 h-4 sm:h-5 bg-gold/70 rounded-sm rotate-[-3deg] shadow-md z-20" />
 
-              {/* Video 4:3 landscape */}
-              <div className="relative aspect-[4/3] rounded-sm overflow-hidden bg-ink">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={{
-                    opacity: status === "ready" || status === "capturing" ? 1 : 0,
-                    transform: "scaleX(-1)",
-                  }}
-                />
+              {mode === "camera" ? (
+                <div className="relative aspect-[4/3] rounded-sm overflow-hidden bg-ink">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{
+                      opacity: status === "ready" || status === "capturing" ? 1 : 0,
+                      transform: "scaleX(-1)",
+                    }}
+                  />
 
-                {status === "idle" && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-4 text-center px-4 sm:px-6 z-10">
-                    <span className="text-5xl sm:text-7xl opacity-40">📷</span>
-                    <p className="font-caveat text-lg sm:text-2xl text-cream/90">kamera belum aktif</p>
-                    <p className="font-caveat text-xs sm:text-sm text-cream/50 max-w-[260px] sm:max-w-xs">Klik tombol di bawah buat mulai.</p>
-                  </div>
-                )}
-
-                {status === "requesting" && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-cream/30 border-t-cream rounded-full" />
-                    <p className="font-caveat text-base sm:text-lg text-cream/70">buka kamera...</p>
-                  </div>
-                )}
-
-                <AnimatePresence>
-                  {countdown !== null && (
-                    <motion.div
-                      key={countdown}
-                      initial={{ opacity: 0, scale: 2 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.5 }}
-                      transition={{ duration: 0.3 }}
-                      className="absolute inset-0 flex items-center justify-center bg-ink/40 pointer-events-none z-20"
-                    >
-                      <span className="font-pacifico text-[110px] sm:text-[160px] md:text-[220px] text-cream drop-shadow-2xl leading-none">{countdown}</span>
-                    </motion.div>
+                  {status === "idle" && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-4 text-center px-4 sm:px-6 z-10">
+                      <span className="text-5xl sm:text-7xl opacity-40">📷</span>
+                      <p className="font-caveat text-lg sm:text-2xl text-cream/90">kamera belum aktif</p>
+                      <p className="font-caveat text-xs sm:text-sm text-cream/50 max-w-[260px] sm:max-w-xs">Klik tombol di bawah buat mulai.</p>
+                    </div>
                   )}
-                </AnimatePresence>
 
-                <AnimatePresence>
-                  {flash && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }} className="absolute inset-0 bg-white z-30 pointer-events-none" />}
-                </AnimatePresence>
+                  {status === "requesting" && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-cream/30 border-t-cream rounded-full" />
+                      <p className="font-caveat text-base sm:text-lg text-cream/70">buka kamera...</p>
+                    </div>
+                  )}
 
-                {(status === "ready" || status === "capturing") && (
-                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-ink/70 backdrop-blur px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-cream font-caveat text-xs sm:text-sm z-20">
-                    foto {Math.min(photos.length + (countdown !== null ? 1 : 0), 3)}/3
-                  </div>
-                )}
+                  <AnimatePresence>
+                    {countdown !== null && (
+                      <motion.div
+                        key={countdown}
+                        initial={{ opacity: 0, scale: 2 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                        transition={{ duration: 0.3 }}
+                        className="absolute inset-0 flex items-center justify-center bg-ink/40 pointer-events-none z-20"
+                      >
+                        <span className="font-pacifico text-[110px] sm:text-[160px] md:text-[220px] text-cream drop-shadow-2xl leading-none">{countdown}</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                {status === "captured" && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3 bg-cream z-10 px-4">
-                    <span className="text-5xl sm:text-6xl">🎉</span>
-                    <p className="font-caveat text-xl sm:text-2xl text-deep-rose">3 foto berhasil!</p>
-                    <p className="font-caveat text-xs sm:text-sm text-ink/50 text-center">download strip di bawah</p>
-                  </div>
-                )}
+                  <AnimatePresence>
+                    {flash && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }} className="absolute inset-0 bg-white z-30 pointer-events-none" />}
+                  </AnimatePresence>
 
-                {status === "error" && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-4 z-10">
-                    <span className="text-5xl sm:text-6xl">😿</span>
-                    <p className="font-caveat text-base sm:text-lg text-cream/90 max-w-[260px]">{errorMsg}</p>
-                  </div>
-                )}
-              </div>
+                  {(status === "ready" || status === "capturing") && (
+                    <div className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-ink/70 backdrop-blur px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-cream font-caveat text-xs sm:text-sm z-20">
+                      foto {Math.min(photoCount + (countdown !== null ? 1 : 0), 3)}/3
+                    </div>
+                  )}
+
+                  {status === "captured" && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3 bg-cream z-10 px-4">
+                      <span className="text-5xl sm:text-6xl">🎉</span>
+                      <p className="font-caveat text-xl sm:text-2xl text-deep-rose">3 foto berhasil!</p>
+                      <p className="font-caveat text-xs sm:text-sm text-ink/50 text-center">download strip di bawah</p>
+                    </div>
+                  )}
+
+                  {status === "error" && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-4 z-10">
+                      <span className="text-5xl sm:text-6xl">😿</span>
+                      <p className="font-caveat text-base sm:text-lg text-cream/90 max-w-[260px]">{errorMsg}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Upload Mode */
+                <div className="space-y-3">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="relative">
+                      <button
+                        onClick={() => handleSlotClick(i)}
+                        className={`relative w-full aspect-[4/3] rounded-sm overflow-hidden border-2 transition ${photos[i] ? "border-gold/60 bg-blush" : "border-dashed border-rose/40 bg-blush hover:border-rose hover:bg-rose/5"}`}
+                      >
+                        {photos[i] ? (
+                          <img src={photos[i]!} alt={`Slot ${i + 1}`} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center">
+                            <span className="text-4xl text-rose/60">📤</span>
+                            <p className="font-caveat text-base text-deep-rose">klik buat upload foto {i + 1}</p>
+                            <p className="font-caveat text-xs text-rose/60">jpg / png / webp</p>
+                          </div>
+                        )}
+
+                        {/* Slot number badge */}
+                        <div className="absolute top-2 left-2 bg-ink/70 backdrop-blur px-2.5 py-1 rounded-full text-cream font-caveat text-xs">#{i + 1}</div>
+                      </button>
+
+                      {/* Remove button (only if filled) */}
+                      {photos[i] && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveSlot(i);
+                          }}
+                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-ink/80 text-cream flex items-center justify-center hover:bg-rose transition text-sm"
+                          aria-label="Hapus foto"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="relative mt-1.5 sm:mt-2 rounded-sm bg-gradient-to-r from-pink via-rose to-pink px-3 sm:px-4 py-2 sm:py-2.5 text-center">
                 <p className="font-caveat text-xs sm:text-sm md:text-base text-cream italic">hi there, im just finished my cemploo</p>
@@ -517,34 +668,45 @@ export default function PhotoBooth() {
             <span className="absolute -bottom-2 -right-2 sm:-bottom-3 sm:-right-3 text-2xl sm:text-3xl rotate-[-10deg] select-none drop-shadow-md z-30">🌷</span>
           </div>
 
+          {/* Action buttons */}
           <div className="mt-4 sm:mt-5 flex flex-col gap-2 max-w-[560px] mx-auto md:max-w-full">
-            {status === "idle" && (
-              <button
-                onClick={startCamera}
-                className="w-full bg-deep-rose text-cream py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase hover:bg-rose transition shadow-lg active:scale-[0.98] touch-manipulation"
-              >
-                📷 Aktifin Kamera
-              </button>
+            {mode === "camera" && (
+              <>
+                {status === "idle" && (
+                  <button
+                    onClick={startCamera}
+                    className="w-full bg-deep-rose text-cream py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase hover:bg-rose transition shadow-lg active:scale-[0.98] touch-manipulation"
+                  >
+                    📷 Aktifin Kamera
+                  </button>
+                )}
+                {status === "requesting" && (
+                  <button disabled className="w-full bg-ink/20 text-ink/40 py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase cursor-wait">
+                    Loading...
+                  </button>
+                )}
+                {status === "ready" && (
+                  <button
+                    onClick={takePhotos}
+                    className="w-full bg-deep-rose text-cream py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase hover:bg-rose transition shadow-lg active:scale-[0.98] touch-manipulation"
+                  >
+                    ✨ Mulai Foto (3x)
+                  </button>
+                )}
+                {status === "capturing" && (
+                  <button disabled className="w-full bg-ink/20 text-ink/40 py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase cursor-wait">
+                    Jangan gerak... ({photoCount}/3)
+                  </button>
+                )}
+                {status === "error" && (
+                  <button onClick={startCamera} className="w-full bg-deep-rose text-cream py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase hover:bg-rose transition shadow-lg active:scale-[0.98]">
+                    🔄 Coba Lagi
+                  </button>
+                )}
+              </>
             )}
-            {status === "requesting" && (
-              <button disabled className="w-full bg-ink/20 text-ink/40 py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase cursor-wait">
-                Loading...
-              </button>
-            )}
-            {status === "ready" && (
-              <button
-                onClick={takePhotos}
-                className="w-full bg-deep-rose text-cream py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase hover:bg-rose transition shadow-lg active:scale-[0.98] touch-manipulation"
-              >
-                ✨ Mulai Foto (3x)
-              </button>
-            )}
-            {status === "capturing" && (
-              <button disabled className="w-full bg-ink/20 text-ink/40 py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase cursor-wait">
-                Jangan gerak... ({photos.length}/3)
-              </button>
-            )}
-            {status === "captured" && (
+
+            {photoCount === 3 && (
               <>
                 <button
                   onClick={downloadStrip}
@@ -557,20 +719,10 @@ export default function PhotoBooth() {
                 </button>
               </>
             )}
-            {status === "error" && (
-              <>
-                <button onClick={startCamera} className="w-full bg-deep-rose text-cream py-4 sm:py-3.5 rounded-full font-semibold text-sm sm:text-xs tracking-widest uppercase hover:bg-rose transition shadow-lg active:scale-[0.98]">
-                  🔄 Coba Lagi
-                </button>
-                <button onClick={reset} className="w-full py-3 sm:py-3.5 rounded-full border-2 border-ink/20 text-ink/60 font-semibold text-sm sm:text-xs tracking-widest uppercase hover:border-ink/40 transition active:scale-[0.98]">
-                  Reset
-                </button>
-              </>
-            )}
           </div>
         </motion.div>
 
-        {/* RIGHT: STRIP PREVIEW — 3 landscape cards */}
+        {/* RIGHT: STRIP PREVIEW */}
         <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }} className="md:col-span-5 w-full">
           <div className="relative max-w-[320px] mx-auto">
             <div className="absolute inset-0 rounded-md rotate-1 translate-x-1.5 translate-y-1.5 bg-gradient-to-br from-rose via-pink to-lavender" />
@@ -579,7 +731,6 @@ export default function PhotoBooth() {
               <div className="absolute inset-1 rounded-sm border-2 border-rose/30 pointer-events-none" />
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 sm:w-20 h-3.5 sm:h-4 bg-gold/70 rounded-sm rotate-[-3deg] shadow-md z-10" />
 
-              {/* Preview 9:16 with landscape cards */}
               <div className="relative aspect-[9/16] bg-cream rounded-sm overflow-hidden border-2 border-ink/30">
                 {[0, 1, 2].map((i) => (
                   <div
@@ -592,7 +743,7 @@ export default function PhotoBooth() {
                       aspectRatio: "4 / 3",
                     }}
                   >
-                    {photos[i] ? <img src={photos[i]} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <span className="text-ink/30 text-base select-none">📷</span>}
+                    {photos[i] ? <img src={photos[i]!} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <span className="text-ink/30 text-base select-none">📷</span>}
                   </div>
                 ))}
 
@@ -612,11 +763,11 @@ export default function PhotoBooth() {
           <div className="mt-5 sm:mt-6 max-w-[420px] mx-auto paper rounded-md p-4 border border-rose/20">
             <p className="font-caveat text-xs text-ink/50 uppercase tracking-wider mb-2">Cara pakai</p>
             <ul className="space-y-1.5 text-[11px] sm:text-xs text-ink/70 font-caveat">
-              <li>• Klik "Aktifin Kamera" → izinin akses kamera</li>
-              <li>• Klik "Mulai Foto" → countdown 3× berturut-turut</li>
               <li>
-                • Foto <strong>4:3 landscape</strong> — pas buat selfie grup
+                • Pilih mode: <strong>Kamera</strong> atau <strong>Upload</strong>
               </li>
+              <li>• Kamera: klik "Aktifin Kamera" → "Mulai Foto"</li>
+              <li>• Upload: klik tiap slot → pilih foto → crop 4:3</li>
               <li>
                 • Download strip <strong>1080×1920 (9:16 portrait)</strong>
               </li>
@@ -625,10 +776,98 @@ export default function PhotoBooth() {
           </div>
 
           <div className="md:hidden mt-4 text-center">
-            <p className="font-caveat text-sm text-ink/50">{photos.length}/3 foto</p>
+            <p className="font-caveat text-sm text-ink/50">{photoCount}/3 foto</p>
           </div>
         </motion.div>
       </div>
+
+      {/* CROP MODAL */}
+      <AnimatePresence>
+        {cropModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[300] bg-ink flex flex-col" style={{ height: "100dvh" }}>
+            {/* Header — solid bg, compact */}
+            <div className="shrink-0 flex items-center justify-between px-4 py-3 bg-ink border-b-2 border-rose/30">
+              <div>
+                <p className="font-caveat text-[10px] sm:text-xs text-rose uppercase tracking-widest">— foto #{cropModal.slotIndex + 1} —</p>
+                <p className="font-pacifico text-base sm:text-lg text-cream leading-tight">Adjust photo</p>
+              </div>
+              <button onClick={handleCropCancel} className="w-11 h-11 rounded-full bg-cream/15 text-cream hover:bg-cream/25 active:scale-95 transition flex items-center justify-center text-lg border border-cream/30" aria-label="Close">
+                ✕
+              </button>
+            </div>
+
+            {/* Cropper area — flexible, takes remaining height */}
+            <div className="relative flex-1 min-h-0 bg-black">
+              <Cropper
+                image={cropModal.imageSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={ASPECT}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={(_area, areaPixels) => setCroppedAreaPixels(areaPixels)}
+                objectFit="contain"
+                showGrid={true}
+                style={{
+                  containerStyle: {
+                    width: "100%",
+                    height: "100%",
+                    background: "#000",
+                  },
+                  cropAreaStyle: {
+                    border: "2px solid #FF8FAB",
+                    borderRadius: "6px",
+                    boxShadow: "0 0 0 9999em rgba(10, 10, 10, 0.75)",
+                  },
+                }}
+              />
+            </div>
+
+            {/* Controls — solid bg, safe-area padding */}
+            <div className="shrink-0 bg-ink border-t-2 border-rose/30 px-4 pt-3" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+              {/* Zoom — single horizontal row, compact */}
+              <div className="flex items-center gap-2.5 mb-2.5">
+                <span className="font-caveat text-xs text-cream font-semibold whitespace-nowrap">🔍</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={3}
+                  step={0.01}
+                  value={zoom}
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                  className="flex-1 cursor-pointer rounded-full"
+                  style={{
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    height: "8px",
+                    background: "rgba(255, 249, 243, 0.15)",
+                    outline: "none",
+                    accentColor: "#FF8FAB",
+                  }}
+                />
+                <span className="font-caveat text-xs text-cream bg-cream/15 px-2 py-0.5 rounded-full tabular-nums min-w-[46px] text-center">{Math.round(zoom * 100)}%</span>
+              </div>
+
+              {/* Buttons — langsung di bawah slider */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCropCancel}
+                  className="flex-1 min-h-[52px] rounded-xl bg-cream text-deep-rose font-bold text-sm tracking-widest uppercase border-[3px] border-deep-rose hover:bg-blush active:scale-[0.97] transition shadow-lg"
+                >
+                  ✕ Batal
+                </button>
+                <button
+                  onClick={handleCropSave}
+                  disabled={savingCrop || !croppedAreaPixels}
+                  className="flex-1 min-h-[52px] rounded-xl bg-deep-rose text-cream font-bold text-sm tracking-widest uppercase border-[3px] border-cream hover:bg-rose active:scale-[0.97] transition shadow-lg disabled:opacity-50 disabled:cursor-wait"
+                >
+                  {savingCrop ? "..." : "✓ Simpan"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </EditorialSection>
   );
 }

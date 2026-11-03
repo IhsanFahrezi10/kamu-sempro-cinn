@@ -6,7 +6,8 @@ import { unlock } from "@/lib/achievements";
 
 type Stage = "error" | "preng";
 const PRANK_KEY = "cinn-fake-error-v1";
-const TRIGGER_DELAY = 8000;
+const GATE_KEY = "cinn-human-check-v1";
+const TRIGGER_DELAY = 3000;
 
 export default function FakeError() {
   const [stage, setStage] = useState<Stage | null>(null);
@@ -18,10 +19,46 @@ export default function FakeError() {
       setDismissed(true);
       return;
     }
-    const t = setTimeout(() => {
-      if (!sessionStorage.getItem(PRANK_KEY)) setStage("error");
-    }, TRIGGER_DELAY);
-    return () => clearTimeout(t);
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const startCountdown = () => {
+      if (timer) return;
+      if (sessionStorage.getItem(PRANK_KEY)) return;
+      if (sessionStorage.getItem(GATE_KEY) !== "1") return;
+
+      timer = setTimeout(() => {
+        if (!sessionStorage.getItem(PRANK_KEY)) {
+          setStage("error");
+        }
+      }, TRIGGER_DELAY);
+    };
+
+    // Kalau gate udah solved sebelumnya (misal user reload setelah gate)
+    if (sessionStorage.getItem(GATE_KEY) === "1") {
+      startCountdown();
+    }
+
+    // Listen event dari HumanCheckGate
+    const handleGateChange = () => {
+      if (sessionStorage.getItem(GATE_KEY) === "1") {
+        startCountdown();
+      }
+    };
+    window.addEventListener("gate-state-change", handleGateChange);
+
+    // Polling fallback — cek tiap 400ms
+    const interval = setInterval(() => {
+      if (sessionStorage.getItem(GATE_KEY) === "1") {
+        startCountdown();
+      }
+    }, 400);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("gate-state-change", handleGateChange);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleReload = () => {
@@ -82,9 +119,17 @@ export default function FakeError() {
 
 function ErrorScreen({ onReload }: { onReload: () => void }) {
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen flex flex-col font-mono">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen flex flex-col font-mono"
+    >
       <div className="border-b border-[#1f1f1f] p-4 flex items-center gap-3 bg-[#111]">
-        <motion.div animate={{ scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }} transition={{ duration: 1.2, repeat: Infinity }} className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />
+        <motion.div
+          animate={{ scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }}
+          transition={{ duration: 1.2, repeat: Infinity }}
+          className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"
+        />
         <span className="text-red-400 font-bold text-sm md:text-base">Build Error</span>
         <span className="text-[#555] text-xs md:text-sm truncate">— next.js 16.4.2</span>
       </div>
@@ -92,19 +137,26 @@ function ErrorScreen({ onReload }: { onReload: () => void }) {
       <div className="flex-1 flex items-center justify-center px-4 md:px-6 py-8 md:py-12">
         <div className="w-full max-w-2xl">
           <div className="text-xs md:text-sm mb-6">
-            <p className="text-red-400 mb-3 font-bold text-sm md:text-lg leading-snug break-words">Uncaught Error: Cannot read properties of undefined (reading 'prengggg')</p>
-            <p className="text-[#888] leading-relaxed text-xs md:text-sm">Component tree failed to hydrate. This can happen if a client component threw during render, or if the server responded with invalid data.</p>
+            <p className="text-red-400 mb-3 font-bold text-sm md:text-lg leading-snug break-words">
+              Uncaught TypeError: Cannot read properties of undefined (reading 'forEach')
+            </p>
+            <p className="text-[#888] leading-relaxed text-xs md:text-sm">
+              This error occurred during the render phase of a client component.
+              The component tree may have been left in an inconsistent state.
+            </p>
           </div>
 
           <div className="border border-[#2a2a2a] rounded overflow-hidden mb-6 md:mb-8">
-            <div className="bg-[#161616] px-3 md:px-4 py-2 border-b border-[#2a2a2a] text-[#888] text-[10px] md:text-xs truncate">./app/page.tsx:108:5</div>
+            <div className="bg-[#161616] px-3 md:px-4 py-2 border-b border-[#2a2a2a] text-[#888] text-[10px] md:text-xs truncate">
+              ./components/DataRenderer.tsx:108:5
+            </div>
             <pre className="bg-[#0D0D0D] p-3 md:p-4 text-[10px] md:text-sm overflow-x-auto text-[#666] leading-relaxed">
-              {`  106 |   );
-  107 | }
-> 108 |   throw new Error("prengggg");
-      |   ^
-  109 |
-  110 |   return <PrankComponent />;
+{`  106 |   const items = await fetchItems();
+  107 |   if (!items) return null;
+> 108 |   items.forEach((item) => {
+      |         ^
+  109 |     processItem(item);
+  110 |   });
   111 |`}
             </pre>
           </div>
@@ -112,7 +164,10 @@ function ErrorScreen({ onReload }: { onReload: () => void }) {
           <div className="text-[#555] text-xs leading-relaxed mb-8 md:mb-10 hidden sm:block">
             <p className="text-[#888] mb-2">Import traces:</p>
             <p> Client Component Browser:</p>
-            <p className="pl-4"> ./app/page.tsx [Client Component Browser]</p>
+            <p className="pl-4"> ./components/DataRenderer.tsx [Client Component Browser]</p>
+            <p className="pl-4"> ./app/page.tsx [Server Component]</p>
+            <p className="mt-2"> Client Component SSR:</p>
+            <p className="pl-4"> ./components/DataRenderer.tsx [Client Component SSR]</p>
             <p className="pl-4"> ./app/page.tsx [Server Component]</p>
           </div>
 
@@ -123,7 +178,9 @@ function ErrorScreen({ onReload }: { onReload: () => void }) {
             >
               ⟳ Reload Page
             </button>
-            <p className="text-[#444] text-xs text-center px-4">Klik tombol di atas untuk reload halaman</p>
+            <p className="text-[#444] text-xs text-center px-4">
+              Klik tombol di atas untuk reload halaman
+            </p>
           </div>
         </div>
       </div>
@@ -175,7 +232,8 @@ function PrengScreen() {
         transition={{ duration: 1.5, ease: "easeOut" }}
         className="absolute w-[400px] h-[400px] md:w-[600px] md:h-[600px] rounded-full pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(255,143,171,0.9) 0%, rgba(199,62,104,0.4) 40%, transparent 70%)",
+          background:
+            "radial-gradient(circle, rgba(255,143,171,0.9) 0%, rgba(199,62,104,0.4) 40%, transparent 70%)",
         }}
       />
 
@@ -187,7 +245,8 @@ function PrengScreen() {
             transition={{ type: "spring", stiffness: 280, damping: 11 }}
             className="font-fredoka font-bold text-[clamp(2.5rem,17vw,14rem)] text-pink-400 leading-[0.85] tracking-tight text-center absolute"
             style={{
-              textShadow: "0 0 20px rgba(255,143,171,1), 0 0 40px rgba(255,143,171,0.9), 0 0 80px rgba(199,62,104,0.8), 0 0 150px rgba(199,62,104,0.5)",
+              textShadow:
+                "0 0 20px rgba(255,143,171,1), 0 0 40px rgba(255,143,171,0.9), 0 0 80px rgba(199,62,104,0.8), 0 0 150px rgba(199,62,104,0.5)",
             }}
           >
             {text}
@@ -198,7 +257,8 @@ function PrengScreen() {
             transition={{ delay: 1, type: "spring", stiffness: 250, damping: 12 }}
             className="font-fredoka font-bold text-[clamp(2.5rem,17vw,14rem)] text-yellow-300 leading-[0.85] tracking-tight text-center absolute"
             style={{
-              textShadow: "0 0 15px rgba(240,201,121,1), 0 0 30px rgba(240,201,121,0.7), 0 0 60px rgba(199,62,104,0.4)",
+              textShadow:
+                "0 0 15px rgba(240,201,121,1), 0 0 30px rgba(240,201,121,0.7), 0 0 60px rgba(199,62,104,0.4)",
             }}
           >
             {text}
@@ -209,16 +269,25 @@ function PrengScreen() {
             transition={{ delay: 2, type: "spring", stiffness: 220, damping: 14 }}
             className="font-fredoka font-bold text-[clamp(2.5rem,17vw,14rem)] text-rose-300 leading-[0.85] tracking-tight text-center absolute"
             style={{
-              textShadow: "0 0 10px rgba(255,143,171,0.8), 0 0 25px rgba(199,62,104,0.5)",
+              textShadow:
+                "0 0 10px rgba(255,143,171,0.8), 0 0 25px rgba(199,62,104,0.5)",
             }}
           >
             {text}
           </motion.h1>
         </div>
-        <div className="font-fredoka font-bold text-[clamp(2.5rem,17vw,14rem)] leading-[0.85] tracking-tight invisible select-none" aria-hidden>
+        <div
+          className="font-fredoka font-bold text-[clamp(2.5rem,17vw,14rem)] leading-[0.85] tracking-tight invisible select-none"
+          aria-hidden
+        >
           {text}
         </div>
-        <motion.p initial={{ opacity: 0, y: 20, scale: 0.5 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: 0.5, type: "spring", stiffness: 200 }} className="text-5xl sm:text-7xl md:text-9xl mt-4 md:mt-6">
+        <motion.p
+          initial={{ opacity: 0, y: 20, scale: 0.5 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
+          className="text-5xl sm:text-7xl md:text-9xl mt-4 md:mt-6"
+        >
           🤪
         </motion.p>
       </div>
@@ -245,7 +314,8 @@ function PrengScreen() {
               style={{
                 color: "transparent",
                 WebkitTextStroke: "2px rgba(255,143,171,0.7)",
-                textShadow: "0 0 15px rgba(255,143,171,0.6), 0 0 30px rgba(199,62,104,0.4)",
+                textShadow:
+                  "0 0 15px rgba(255,143,171,0.6), 0 0 30px rgba(199,62,104,0.4)",
               }}
             >
               {char}
