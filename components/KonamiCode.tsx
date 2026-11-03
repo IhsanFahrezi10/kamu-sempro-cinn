@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
-import { unlock } from "@/lib/achievements";
 
 const SEQUENCE = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
 
@@ -16,7 +15,6 @@ export default function KonamiCode() {
         const next = idx + 1;
         if (next === SEQUENCE.length) {
           setShow(true);
-          unlock("konami");
           confetti({ particleCount: 200, spread: 120, origin: { y: 0.5 }, colors: ["#FF8FAB", "#F0C979", "#E0C9F0", "#C73E68"] });
           setTimeout(() => setShow(false), 5000);
           setIdx(0);

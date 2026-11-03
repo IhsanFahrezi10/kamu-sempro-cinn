@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { unlock } from "@/lib/achievements";
 
 // ⚠️ GANTI dengan nomor WA lo (format: 62xxx, tanpa + atau 0 depan)
 const OWNER_PHONE = "6282213275683";
@@ -24,7 +23,6 @@ export default function ResponseForm() {
     const url = `https://wa.me/${OWNER_PHONE}?text=${encodeURIComponent(body)}`;
 
     window.open(url, "_blank");
-    unlock("share");
     setSent(true);
   };
 

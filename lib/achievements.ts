@@ -1,22 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export type AchievementKey = "gift" | "music" | "fortune" | "jump" | "catch" | "quiz" | "kit" | "wish" | "sticker" | "share" | "konami" | "error";
+export type AchievementKey = "gift" | "music" | "fortune" | "jump" | "catch" | "quiz" | "kit" | "wish" | "sticker" | "error";
 
 const KEY = "cinn-achievements-v4";
 
 export const ACHIEVEMENT_META: Record<AchievementKey, { label: string; emoji: string }> = {
   gift: { label: "Buka kado", emoji: "🎁" },
   music: { label: "Nyalain musik", emoji: "🎵" },
-  fortune: { label: "Matcha flip", emoji: "🍵" },
-  jump: { label: "Jumpin' Cat", emoji: "🐾" },
+  fortune: { label: "Ramalan matcha", emoji: "🍵" },
+  jump: { label: "Kucing lompat", emoji: "🐾" },
   catch: { label: "Tangkap ikan", emoji: "🐟" },
-  quiz: { label: "Quiz", emoji: "📝" },
+  quiz: { label: "Quiz Cinn", emoji: "📝" },
   kit: { label: "Celebration kit", emoji: "🎒" },
   wish: { label: "Kasih makan", emoji: "🍖" },
   sticker: { label: "Buka stiker", emoji: "🌸" },
-  share: { label: "Share", emoji: "📤" },
-  konami: { label: "Easter egg", emoji: "🎮" },
   error: { label: "Error palsu", emoji: "💥" },
 };
 
@@ -48,4 +46,4 @@ export function useAchievements(): Set<AchievementKey> {
   return set;
 }
 
-export const ALL_ACHIEVEMENTS: AchievementKey[] = ["gift", "music", "fortune", "jump", "catch", "quiz", "kit", "wish", "sticker", "share", "konami", "error"];
+export const ALL_ACHIEVEMENTS: AchievementKey[] = ["gift", "music", "fortune", "jump", "catch", "quiz", "kit", "wish", "sticker", "error"];
