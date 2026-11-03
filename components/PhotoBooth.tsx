@@ -55,27 +55,44 @@ export default function PhotoBooth() {
     }
   };
 
+  // ✅ Capture 3:4 portrait (900×1200)
   const capturePhoto = (): string | null => {
     if (!videoRef.current || !canvasRef.current) return null;
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const size = 900;
-    canvas.width = size;
-    canvas.height = size;
+    const W = 900;
+    const H = 1200; // 3:4 portrait
+    canvas.width = W;
+    canvas.height = H;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
     const vw = video.videoWidth || 640;
     const vh = video.videoHeight || 480;
-    const minDim = Math.min(vw, vh);
-    const sx = (vw - minDim) / 2;
-    const sy = (vh - minDim) / 2;
+    const targetAspect = W / H; // 0.75
 
-    // ✅ MIRROR output biar match selfie view (kayak preview di HP)
+    let sw = vw;
+    let sh = vh;
+    let sx = 0;
+    let sy = 0;
+
+    if (vw / vh > targetAspect) {
+      // Video lebih lebar, crop samping
+      sh = vh;
+      sw = vh * targetAspect;
+      sx = (vw - sw) / 2;
+    } else {
+      // Video lebih tinggi, crop atas-bawah
+      sw = vw;
+      sh = vw / targetAspect;
+      sy = (vh - sh) / 2;
+    }
+
+    // Mirror output
     ctx.save();
-    ctx.translate(size, 0);
+    ctx.translate(W, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, size, size);
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
     ctx.restore();
 
     return canvas.toDataURL("image/jpeg", 0.9);
@@ -143,15 +160,15 @@ export default function PhotoBooth() {
 
       const W = 1080;
       const H = 1920;
-      const PAD_TOP = 40;
-      const PAD_SIDE = 80;
-      const CARD_W = W - PAD_SIDE * 2;
-      const CARD_H = 560;
-      const CARD_X = PAD_SIDE;
-      const GAP = 10;
-      const PHOTO_PAD = 16;
-      const PHOTO_W = CARD_W - PHOTO_PAD * 2;
-      const PHOTO_H = CARD_H - PHOTO_PAD * 2;
+      const PAD_TOP = 30;
+      // Card sempit, aspect 3:4 → photo jadi portrait
+      const CARD_W = 433;
+      const CARD_H = 568;
+      const CARD_X = Math.round((W - CARD_W) / 2); // 324
+      const GAP = 8;
+      const PHOTO_PAD = 14;
+      const PHOTO_W = CARD_W - PHOTO_PAD * 2; // 405
+      const PHOTO_H = CARD_H - PHOTO_PAD * 2; // 540
 
       const canvas = document.createElement("canvas");
       canvas.width = W;
@@ -159,12 +176,14 @@ export default function PhotoBooth() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
+      // Background gradient
       const bg = ctx.createLinearGradient(0, 0, 0, H);
       bg.addColorStop(0, "#FFF9F3");
       bg.addColorStop(1, "#FFE5EC");
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
+      // Outer borders
       const border = ctx.createLinearGradient(0, 0, W, H);
       border.addColorStop(0, "#FF8FAB");
       border.addColorStop(0.5, "#C73E68");
@@ -177,6 +196,7 @@ export default function PhotoBooth() {
       ctx.lineWidth = 2;
       ctx.strokeRect(20, 20, W - 40, H - 40);
 
+      // Corner emojis
       ctx.font = "32px serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -185,24 +205,30 @@ export default function PhotoBooth() {
       ctx.fillText("💖", 42, H - 42);
       ctx.fillText("🌷", W - 42, H - 42);
 
+      // 3 polaroids stacked — 3:4 portrait per photo
       for (let i = 0; i < 3; i++) {
         const cy = PAD_TOP + i * (CARD_H + GAP);
 
+        // Shadow
         ctx.fillStyle = "rgba(74, 46, 58, 0.12)";
         ctx.fillRect(CARD_X + 3, cy + 3, CARD_W, CARD_H);
 
+        // Card cream
         ctx.fillStyle = "#FFF9F3";
         ctx.fillRect(CARD_X, cy, CARD_W, CARD_H);
 
+        // Photo
         drawCover(ctx, imgs[i], CARD_X + PHOTO_PAD, cy + PHOTO_PAD, PHOTO_W, PHOTO_H);
 
+        // Photo border
         ctx.strokeStyle = "#4A2E3A";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(CARD_X + PHOTO_PAD, cy + PHOTO_PAD, PHOTO_W, PHOTO_H);
       }
 
-      const lastCardEnd = PAD_TOP + 3 * CARD_H + 2 * GAP;
-      const sigY = lastCardEnd + 55;
+      // Signature — compact
+      const lastCardEnd = PAD_TOP + 3 * CARD_H + 2 * GAP; // 30 + 1704 + 16 = 1750
+      const sigY = lastCardEnd + 55; // ~1805
 
       ctx.fillStyle = "#C73E68";
       ctx.font = "italic 30px Georgia, serif";
@@ -254,7 +280,7 @@ export default function PhotoBooth() {
           Photo <em className="italic">booth.</em>
         </>
       }
-      subtitle="Aktifin kamera, ambil 3 foto, langsung jadi strip 9:16"
+      subtitle="Aktifin kamera, ambil 3 foto portrait, langsung jadi strip 9:16"
       meta={
         <div className="hidden md:flex flex-col items-end gap-1">
           <span className="stamp">Selfie ✿</span>
@@ -274,8 +300,8 @@ export default function PhotoBooth() {
               <div className="absolute inset-1 rounded-sm border-2 border-rose/40 pointer-events-none z-10" />
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 sm:w-24 h-4 sm:h-5 bg-gold/70 rounded-sm rotate-[-3deg] shadow-md z-20" />
 
-              <div className="relative aspect-square rounded-sm overflow-hidden bg-ink">
-                {/* Video preview — mirror biar sesuai selfie camera */}
+              {/* Video 3:4 portrait container */}
+              <div className="relative aspect-[3/4] rounded-sm overflow-hidden bg-ink">
                 <video
                   ref={videoRef}
                   autoPlay
@@ -408,7 +434,7 @@ export default function PhotoBooth() {
           </div>
         </motion.div>
 
-        {/* RIGHT: STRIP PREVIEW — GRID explicit rows, no cut off */}
+        {/* RIGHT: STRIP PREVIEW — 3:4 portrait cards */}
         <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }} className="md:col-span-5 w-full">
           <div className="relative max-w-[320px] mx-auto">
             <div className="absolute inset-0 rounded-md rotate-1 translate-x-1.5 translate-y-1.5 bg-gradient-to-br from-rose via-pink to-lavender" />
@@ -417,18 +443,27 @@ export default function PhotoBooth() {
               <div className="absolute inset-1 rounded-sm border-2 border-rose/30 pointer-events-none" />
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 sm:w-20 h-3.5 sm:h-4 bg-gold/70 rounded-sm rotate-[-3deg] shadow-md z-10" />
 
-              {/* GRID preview — 4 rows: 3 photos + signature */}
+              {/* Preview — 9:16 with narrow 3:4 cards centered */}
               <div className="relative aspect-[9/16] bg-cream rounded-sm overflow-hidden border-2 border-ink/30">
-                <div className="absolute inset-1.5 grid grid-rows-[1fr_1fr_1fr_auto] gap-1">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="bg-blush rounded-sm overflow-hidden relative flex items-center justify-center min-h-0">
-                      {photos[i] ? <img src={photos[i]} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <span className="text-sm text-ink/30 select-none">📷</span>}
-                    </div>
-                  ))}
-                  <div className="text-center pt-0.5 pb-0.5">
-                    <p className="font-caveat text-[7px] text-deep-rose italic leading-tight">hi there, im just finished my cemploo</p>
-                    <p className="font-caveat text-[6px] text-rose/60 leading-tight">-cinti-</p>
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="absolute bg-blush rounded-sm overflow-hidden flex items-center justify-center"
+                    style={{
+                      left: "30%",
+                      top: `${1.5 + i * 30.6}%`,
+                      width: "40%",
+                      aspectRatio: "3 / 4",
+                    }}
+                  >
+                    {photos[i] ? <img src={photos[i]} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <span className="text-ink/30 text-base select-none">📷</span>}
                   </div>
+                ))}
+
+                {/* Signature */}
+                <div className="absolute left-0 right-0 text-center" style={{ top: "93.5%" }}>
+                  <p className="font-caveat text-[6px] text-deep-rose italic leading-tight">hi there, im just finished my cemploo</p>
+                  <p className="font-caveat text-[5px] text-rose/60 leading-tight">-cinti-</p>
                 </div>
               </div>
             </div>
@@ -445,10 +480,12 @@ export default function PhotoBooth() {
               <li>• Klik "Aktifin Kamera" → izinin akses kamera</li>
               <li>• Klik "Mulai Foto" → countdown 3× berturut-turut</li>
               <li>
+                • Foto <strong>3:4 portrait</strong> — pas buat selfie
+              </li>
+              <li>
                 • Download strip <strong>1080×1920 (9:16 portrait)</strong>
               </li>
               <li>• Foto selfie-style (mirror, sesuai yang kamu lihat)</li>
-              <li>• Pas untuk IG Story, WhatsApp Status, TikTok</li>
             </ul>
           </div>
 
