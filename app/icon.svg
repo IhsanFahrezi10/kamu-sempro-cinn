@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Background rounded square pink -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#FF8FAB" />
+
+  <!-- Steam dots -->
+  <circle cx="26" cy="14" r="2" fill="#FFF9F3" opacity="0.9" />
+  <circle cx="32" cy="11" r="2.2" fill="#FFF9F3" opacity="0.7" />
+  <circle cx="38" cy="14" r="1.8" fill="#FFF9F3" opacity="0.5" />
+
+  <!-- Cup body -->
+  <path
+    d="M16 22 L20 48 Q20 52 24 52 L40 52 Q44 52 44 48 L48 22 Z"
+    fill="#FFF9F3"
+    stroke="#C73E68"
+    stroke-width="2"
+    stroke-linejoin="round"
+  />
+
+  <!-- Matcha liquid inside cup -->
+  <path
+    d="M18.5 30 L40.5 30 L43.5 46 Q43.5 48.5 41.5 48.5 L22.5 48.5 Q20.5 48.5 20.5 46 Z"
+    fill="#8FA88F"
+  />
+
+  <!-- Liquid surface highlight -->
+  <ellipse cx="29.5" cy="30.5" rx="10.5" ry="1.8" fill="#A8C686" />
+
+  <!-- Cup rim -->
+  <ellipse
+    cx="32"
+    cy="22"
+    rx="16"
+    ry="4"
+    fill="#FFF9F3"
+    stroke="#C73E68"
+    stroke-width="2"
+  />
+
+  <!-- Small leaf on rim -->
+  <path
+    d="M42 18 Q46 14 48 18 Q46 22 42 18 Z"
+    fill="#8FA88F"
+    stroke="#4A2E3A"
+    stroke-width="1"
+  />
+  <line x1="43" y1="18" x2="47" y2="18" stroke="#4A2E3A" stroke-width="0.8" />
+</svg>

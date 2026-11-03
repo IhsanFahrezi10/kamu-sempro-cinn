@@ -1,0 +1,377 @@
+@import "tailwindcss";
+
+/* Font Family Definitions — dari Google Fonts <link> */
+:root {
+  --font-librebaskerville: "Libre Baskerville", Georgia, serif;
+  --font-karla: "Karla", system-ui, sans-serif;
+  --font-bricolage: "Bricolage Grotesque", system-ui, sans-serif;
+
+  /* Color variables (tetap di sini) */
+  --cream: #fff9f3;
+  --blush: #ffe5ec;
+  --pink: #ffc1d5;
+  --rose: #ff8fab;
+  --deep-rose: #c73e68;
+  --lavender: #e0c9f0;
+  --gold: #f0c979;
+  --ink: #4a2e3a;
+  --sage: #8fa88f;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+html {
+  scroll-behavior: smooth;
+}
+html,
+body {
+  background: var(--blush);
+  color: var(--ink);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+body {
+  font-family: var(--font-karla), system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-librebaskerville), Georgia, serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-feature-settings: "liga", "kern";
+}
+
+/* Aksen global — Bricolage Grotesque Medium */
+.font-caveat,
+.font-hand {
+  font-family: var(--font-bricolage), system-ui, sans-serif;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0.01em;
+}
+
+/* Aksen Card — Libre Baskerville Italic (pengganti Bricolage italic yang nggak ada) */
+.font-playwrite,
+.font-script {
+  font-family: var(--font-librebaskerville), Georgia, serif;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+}
+
+@media (pointer: fine) {
+  body,
+  a,
+  button {
+    cursor: none;
+  }
+}
+::selection {
+  background: var(--rose);
+  color: var(--cream);
+}
+
+/* Custom cursor */
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+  will-change: transform;
+}
+.cursor-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--deep-rose);
+  border-radius: 50%;
+}
+.cursor-ring {
+  width: 38px;
+  height: 38px;
+  border: 1.5px solid var(--deep-rose);
+  border-radius: 50%;
+  transition:
+    width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    height 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s,
+    background-color 0.3s;
+}
+.cursor-ring.hovering {
+  width: 70px;
+  height: 70px;
+  border-color: var(--rose);
+  background: rgba(255, 143, 171, 0.1);
+}
+
+/* Keyframes */
+@keyframes drift {
+  0% {
+    transform: translateX(-10vw);
+  }
+  100% {
+    transform: translateX(110vw);
+  }
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+@keyframes rise {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-110vh) scale(1.1);
+    opacity: 0;
+  }
+}
+@keyframes shoot {
+  0% {
+    transform: translate(0, 0) rotate(35deg) scaleX(0);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(0, 0) rotate(35deg) scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(50vw, 35vw) rotate(35deg) scaleX(1);
+    opacity: 0;
+  }
+}
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-18px) rotate(2deg);
+  }
+}
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1.3);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.5);
+  }
+}
+@keyframes cat-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}
+@keyframes sway-alt {
+  0%,
+  100% {
+    transform: rotate(2deg);
+  }
+  50% {
+    transform: rotate(-3deg);
+  }
+}
+
+.sway-slow {
+  animation: sway 8s ease-in-out infinite;
+  transform-origin: top left;
+  will-change: transform;
+}
+.sway-slow-alt {
+  animation: sway-alt 10s ease-in-out infinite;
+  transform-origin: top right;
+  will-change: transform;
+}
+
+/* Paper */
+.paper {
+  background-color: var(--cream);
+  background-image: radial-gradient(circle at 20% 20%, rgba(255, 193, 213, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(224, 201, 240, 0.1) 0%, transparent 50%);
+}
+
+/* Editorial utilities */
+.editorial-rule {
+  height: 1px;
+  background: linear-gradient(to right, transparent 0%, var(--rose) 15%, var(--rose) 85%, transparent 100%);
+  opacity: 0.35;
+}
+.chapter-num {
+  font-family: var(--font-librebaskerville), Georgia, serif;
+  font-size: clamp(4rem, 11vw, 10rem);
+  line-height: 0.85;
+  color: var(--deep-rose);
+  opacity: 0.15;
+  user-select: none;
+  font-weight: 700;
+}
+.vertical-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.42em;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--deep-rose);
+  opacity: 0.55;
+  font-weight: 600;
+}
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1.5px solid var(--deep-rose);
+  padding: 0.4rem 0.9rem;
+  transform: rotate(-4deg);
+  color: var(--deep-rose);
+  font-family: var(--font-bricolage), system-ui, sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 600;
+  opacity: 0.75;
+}
+.bg-num {
+  font-family: var(--font-librebaskerville), Georgia, serif;
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  color: var(--rose);
+  opacity: 0.06;
+  line-height: 0.8;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--blush);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--pink);
+  border-radius: 5px;
+  border: 2px solid var(--blush);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--rose);
+}
+/* ========== RECEIPT PRINT STYLES ========== */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+
+  /* Reset layout supaya body nggak sisa ruang */
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* ===== KUNCI: hide SEMUA elemen body, kecuali portal receipt ===== */
+  body > *:not(.receipt-portal-root) {
+    display: none !important;
+  }
+
+  /* Portal jadi static — biar receipt flow natural */
+  .receipt-portal-root {
+    position: static !important;
+    display: block !important;
+    inset: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    background: white !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    overflow: visible !important;
+    z-index: auto !important;
+  }
+
+  .receipt-modal-inner {
+    position: static !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  /* Hide elemen dekoratif & tombol */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Receipt — full width, no shadow, no border */
+  .receipt-printable {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 4mm 3mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+    font-size: 10px !important;
+  }
+
+  .receipt-printable * {
+    color: black !important;
+    border-color: black !important;
+  }
+
+  .receipt-printable .bg-cream {
+    background: white !important;
+  }
+
+  /* Barcode & emoji tetap hitam/visible */
+  .receipt-printable .bg-ink {
+    background: black !important;
+  }
+}
