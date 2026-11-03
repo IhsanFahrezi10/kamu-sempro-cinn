@@ -40,9 +40,12 @@ export default function PhotoBooth() {
       setStatus("ready");
     } catch (err: any) {
       const name = err?.name || "";
-      if (name === "NotAllowedError") setErrorMsg("Izin kamera ditolak. Buka setting browser → izinkan kamera untuk situs ini.");
-      else if (name === "NotFoundError") setErrorMsg("Kamera nggak ditemukan. Pastiin perangkat punya kamera.");
-      else if (name === "NotReadableError") setErrorMsg("Kamera lagi dipake aplikasi lain. Tutup dulu Zoom/Meet/etc.");
+      if (name === "NotAllowedError")
+        setErrorMsg("Izin kamera ditolak. Buka setting browser → izinkan kamera untuk situs ini.");
+      else if (name === "NotFoundError")
+        setErrorMsg("Kamera nggak ditemukan. Pastiin perangkat punya kamera.");
+      else if (name === "NotReadableError")
+        setErrorMsg("Kamera lagi dipake aplikasi lain. Tutup dulu Zoom/Meet/etc.");
       else setErrorMsg("Kamera gagal kebuka. Coba lagi ya.");
       setStatus("error");
     }
@@ -55,13 +58,12 @@ export default function PhotoBooth() {
     }
   };
 
-  // ✅ Capture 3:4 portrait (900×1200)
   const capturePhoto = (): string | null => {
     if (!videoRef.current || !canvasRef.current) return null;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const W = 900;
-    const H = 1200; // 3:4 portrait
+    const H = 1200;
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext("2d");
@@ -69,7 +71,7 @@ export default function PhotoBooth() {
 
     const vw = video.videoWidth || 640;
     const vh = video.videoHeight || 480;
-    const targetAspect = W / H; // 0.75
+    const targetAspect = W / H;
 
     let sw = vw;
     let sh = vh;
@@ -77,18 +79,15 @@ export default function PhotoBooth() {
     let sy = 0;
 
     if (vw / vh > targetAspect) {
-      // Video lebih lebar, crop samping
       sh = vh;
       sw = vh * targetAspect;
       sx = (vw - sw) / 2;
     } else {
-      // Video lebih tinggi, crop atas-bawah
       sw = vw;
       sh = vw / targetAspect;
       sy = (vh - sh) / 2;
     }
 
-    // Mirror output
     ctx.save();
     ctx.translate(W, 0);
     ctx.scale(-1, 1);
@@ -133,13 +132,17 @@ export default function PhotoBooth() {
       img.src = src;
     });
 
-  const drawCover = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number) => {
+  const drawCover = (
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number
+  ) => {
     const imgAspect = img.width / img.height;
     const targetAspect = dw / dh;
-    let sx = 0,
-      sy = 0,
-      sw = img.width,
-      sh = img.height;
+    let sx = 0, sy = 0, sw = img.width, sh = img.height;
 
     if (imgAspect > targetAspect) {
       sh = img.height;
@@ -153,6 +156,135 @@ export default function PhotoBooth() {
     ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
   };
 
+  // 🎨 Draw decorations di margin kiri-kanan tiap card
+  const drawMarginDecorations = (
+    ctx: CanvasRenderingContext2D,
+    cardIndex: number,
+    cy: number,
+    W: number
+  ) => {
+    type Decor = { emoji: string; x: number; y: number; size: number; rotate: number };
+
+    const DECOR_SETS: { left: Decor[]; right: Decor[] }[] = [
+      // Card 1 — Kucing terbang + sakura + sparkles
+      {
+        left: [
+          { emoji: "🌸", x: 90, y: 80, size: 42, rotate: -15 },
+          { emoji: "🐱", x: 175, y: 240, size: 52, rotate: 8 },
+          { emoji: "🦋", x: 100, y: 240, size: 32, rotate: 10 },
+          { emoji: "✨", x: 80, y: 240, size: 22, rotate: 0 },
+          { emoji: "🍃", x: 85, y: 420, size: 38, rotate: 20 },
+          { emoji: "⭐", x: 210, y: 480, size: 30, rotate: -10 },
+        ],
+        right: [
+          { emoji: "⭐", x: W - 100, y: 100, size: 34, rotate: 15 },
+          { emoji: "🐱", x: W - 180, y: 280, size: 52, rotate: -8 },
+          { emoji: "🦋", x: W - 100, y: 280, size: 32, rotate: -10 },
+          { emoji: "✨", x: W - 80, y: 280, size: 22, rotate: 0 },
+          { emoji: "💗", x: W - 105, y: 440, size: 38, rotate: -15 },
+          { emoji: "🌸", x: W - 200, y: 500, size: 30, rotate: 10 },
+        ],
+      },
+      // Card 2 — Matcha + hearts + butterfly
+      {
+        left: [
+          { emoji: "🦋", x: 115, y: 90, size: 38, rotate: 25 },
+          { emoji: "🌷", x: 85, y: 270, size: 44, rotate: -20 },
+          { emoji: "✨", x: 195, y: 350, size: 24, rotate: 0 },
+          { emoji: "🍵", x: 125, y: 460, size: 42, rotate: 5 },
+          { emoji: "💗", x: 210, y: 130, size: 30, rotate: 15 },
+        ],
+        right: [
+          { emoji: "😸", x: W - 130, y: 90, size: 50, rotate: -15 },
+          { emoji: "🦋", x: W - 215, y: 90, size: 32, rotate: 10 },
+          { emoji: "🌟", x: W - 200, y: 200, size: 32, rotate: 0 },
+          { emoji: "🌸", x: W - 95, y: 310, size: 42, rotate: 20 },
+          { emoji: "💗", x: W - 210, y: 430, size: 36, rotate: -10 },
+          { emoji: "✨", x: W - 105, y: 490, size: 26, rotate: 0 },
+        ],
+      },
+      // Card 3 — Party vibes: stars + tulip + matcha
+      {
+        left: [
+          { emoji: "⭐", x: 95, y: 110, size: 36, rotate: -25 },
+          { emoji: "🐱", x: 180, y: 260, size: 50, rotate: 10 },
+          { emoji: "✨", x: 100, y: 260, size: 22, rotate: 0 },
+          { emoji: "💗", x: 100, y: 390, size: 36, rotate: -5 },
+          { emoji: "🍃", x: 195, y: 490, size: 32, rotate: 15 },
+        ],
+        right: [
+          { emoji: "🌸", x: W - 105, y: 90, size: 40, rotate: 20 },
+          { emoji: "🐱", x: W - 200, y: 240, size: 52, rotate: -12 },
+          { emoji: "🦋", x: W - 105, y: 240, size: 30, rotate: 5 },
+          { emoji: "✨", x: W - 85, y: 240, size: 22, rotate: 0 },
+          { emoji: "🌷", x: W - 195, y: 410, size: 38, rotate: 15 },
+          { emoji: "🌟", x: W - 105, y: 500, size: 32, rotate: -20 },
+        ],
+      },
+    ];
+
+    const set = DECOR_SETS[cardIndex % DECOR_SETS.length];
+
+    // Confetti dots — tekstur subtle di background margin
+    const dotColors = ["#FF8FAB", "#FFC1D5", "#F0C979", "#E0C9F0", "#8FA88F"];
+    const dotPositions = [
+      { x: 50, y: 150, size: 5 }, { x: 240, y: 180, size: 4 },
+      { x: 130, y: 340, size: 6 }, { x: 55, y: 380, size: 4 },
+      { x: 260, y: 420, size: 5 }, { x: 160, y: 530, size: 4 },
+      { x: W - 50, y: 150, size: 5 }, { x: W - 240, y: 180, size: 4 },
+      { x: W - 130, y: 340, size: 6 }, { x: W - 55, y: 380, size: 4 },
+      { x: W - 260, y: 420, size: 5 }, { x: W - 160, y: 530, size: 4 },
+    ];
+
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    dotPositions.forEach((d, i) => {
+      ctx.fillStyle = dotColors[i % dotColors.length];
+      ctx.beginPath();
+      ctx.arc(d.x, cy + d.y, d.size, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+
+    // Sparkle dots — small white accent
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "#FFFFFF";
+    [
+      { x: 170, y: 100 }, { x: 240, y: 300 }, { x: 60, y: 460 },
+      { x: W - 170, y: 100 }, { x: W - 240, y: 300 }, { x: W - 60, y: 460 },
+    ].forEach((d) => {
+      ctx.beginPath();
+      ctx.arc(d.x, cy + d.y, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+
+    // Emoji decorations — left
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    set.left.forEach((d) => {
+      ctx.save();
+      ctx.globalAlpha = 0.8;
+      ctx.translate(d.x, cy + d.y);
+      ctx.rotate((d.rotate * Math.PI) / 180);
+      ctx.font = `${d.size}px serif`;
+      ctx.fillText(d.emoji, 0, 0);
+      ctx.restore();
+    });
+
+    // Emoji decorations — right
+    set.right.forEach((d) => {
+      ctx.save();
+      ctx.globalAlpha = 0.8;
+      ctx.translate(d.x, cy + d.y);
+      ctx.rotate((d.rotate * Math.PI) / 180);
+      ctx.font = `${d.size}px serif`;
+      ctx.fillText(d.emoji, 0, 0);
+      ctx.restore();
+    });
+  };
+
   const downloadStrip = async () => {
     if (photos.length !== 3) return;
     try {
@@ -161,14 +293,13 @@ export default function PhotoBooth() {
       const W = 1080;
       const H = 1920;
       const PAD_TOP = 30;
-      // Card sempit, aspect 3:4 → photo jadi portrait
       const CARD_W = 433;
       const CARD_H = 568;
-      const CARD_X = Math.round((W - CARD_W) / 2); // 324
+      const CARD_X = Math.round((W - CARD_W) / 2);
       const GAP = 8;
       const PHOTO_PAD = 14;
-      const PHOTO_W = CARD_W - PHOTO_PAD * 2; // 405
-      const PHOTO_H = CARD_H - PHOTO_PAD * 2; // 540
+      const PHOTO_W = CARD_W - PHOTO_PAD * 2;
+      const PHOTO_H = CARD_H - PHOTO_PAD * 2;
 
       const canvas = document.createElement("canvas");
       canvas.width = W;
@@ -205,7 +336,13 @@ export default function PhotoBooth() {
       ctx.fillText("💖", 42, H - 42);
       ctx.fillText("🌷", W - 42, H - 42);
 
-      // 3 polaroids stacked — 3:4 portrait per photo
+      // 🎨 Draw margin decorations FIRST (behind cards)
+      for (let i = 0; i < 3; i++) {
+        const cy = PAD_TOP + i * (CARD_H + GAP);
+        drawMarginDecorations(ctx, i, cy, W);
+      }
+
+      // Draw polaroid cards on top
       for (let i = 0; i < 3; i++) {
         const cy = PAD_TOP + i * (CARD_H + GAP);
 
@@ -226,9 +363,9 @@ export default function PhotoBooth() {
         ctx.strokeRect(CARD_X + PHOTO_PAD, cy + PHOTO_PAD, PHOTO_W, PHOTO_H);
       }
 
-      // Signature — compact
-      const lastCardEnd = PAD_TOP + 3 * CARD_H + 2 * GAP; // 30 + 1704 + 16 = 1750
-      const sigY = lastCardEnd + 55; // ~1805
+      // Signature
+      const lastCardEnd = PAD_TOP + 3 * CARD_H + 2 * GAP;
+      const sigY = lastCardEnd + 55;
 
       ctx.fillStyle = "#C73E68";
       ctx.font = "italic 30px Georgia, serif";
@@ -284,7 +421,9 @@ export default function PhotoBooth() {
       meta={
         <div className="hidden md:flex flex-col items-end gap-1">
           <span className="stamp">Selfie ✿</span>
-          <span className="font-caveat text-xs text-ink/40 mt-2 tabular-nums">{photos.length}/3</span>
+          <span className="font-caveat text-xs text-ink/40 mt-2 tabular-nums">
+            {photos.length}/3
+          </span>
         </div>
       }
     >
@@ -292,7 +431,13 @@ export default function PhotoBooth() {
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-12 items-start">
         {/* LEFT: KAMERA */}
-        <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} className="md:col-span-7 w-full">
+        <motion.div
+          initial={{ opacity: 0, x: -30 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="md:col-span-7 w-full"
+        >
           <div className="relative max-w-[500px] mx-auto md:max-w-full">
             <div className="absolute inset-0 rounded-md rotate-1 translate-x-1 translate-y-1 bg-gradient-to-br from-rose via-pink to-lavender" />
 
@@ -300,7 +445,6 @@ export default function PhotoBooth() {
               <div className="absolute inset-1 rounded-sm border-2 border-rose/40 pointer-events-none z-10" />
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 sm:w-24 h-4 sm:h-5 bg-gold/70 rounded-sm rotate-[-3deg] shadow-md z-20" />
 
-              {/* Video 3:4 portrait container */}
               <div className="relative aspect-[3/4] rounded-sm overflow-hidden bg-ink">
                 <video
                   ref={videoRef}
@@ -318,13 +462,19 @@ export default function PhotoBooth() {
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-4 text-center px-4 sm:px-6 z-10">
                     <span className="text-5xl sm:text-7xl opacity-40">📷</span>
                     <p className="font-caveat text-lg sm:text-2xl text-cream/90">kamera belum aktif</p>
-                    <p className="font-caveat text-xs sm:text-sm text-cream/50 max-w-[260px] sm:max-w-xs">Klik tombol di bawah buat mulai.</p>
+                    <p className="font-caveat text-xs sm:text-sm text-cream/50 max-w-[260px] sm:max-w-xs">
+                      Klik tombol di bawah buat mulai.
+                    </p>
                   </div>
                 )}
 
                 {status === "requesting" && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-cream/30 border-t-cream rounded-full" />
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                      className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-cream/30 border-t-cream rounded-full"
+                    />
                     <p className="font-caveat text-base sm:text-lg text-cream/70">buka kamera...</p>
                   </div>
                 )}
@@ -339,13 +489,23 @@ export default function PhotoBooth() {
                       transition={{ duration: 0.3 }}
                       className="absolute inset-0 flex items-center justify-center bg-ink/40 pointer-events-none z-20"
                     >
-                      <span className="font-pacifico text-[110px] sm:text-[160px] md:text-[220px] text-cream drop-shadow-2xl leading-none">{countdown}</span>
+                      <span className="font-pacifico text-[110px] sm:text-[160px] md:text-[220px] text-cream drop-shadow-2xl leading-none">
+                        {countdown}
+                      </span>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
                 <AnimatePresence>
-                  {flash && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }} className="absolute inset-0 bg-white z-30 pointer-events-none" />}
+                  {flash && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.1 }}
+                      className="absolute inset-0 bg-white z-30 pointer-events-none"
+                    />
+                  )}
                 </AnimatePresence>
 
                 {(status === "ready" || status === "capturing") && (
@@ -358,7 +518,9 @@ export default function PhotoBooth() {
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3 bg-cream z-10 px-4">
                     <span className="text-5xl sm:text-6xl">🎉</span>
                     <p className="font-caveat text-xl sm:text-2xl text-deep-rose">3 foto berhasil!</p>
-                    <p className="font-caveat text-xs sm:text-sm text-ink/50 text-center">download strip di bawah</p>
+                    <p className="font-caveat text-xs sm:text-sm text-ink/50 text-center">
+                      download strip di bawah
+                    </p>
                   </div>
                 )}
 
@@ -371,7 +533,9 @@ export default function PhotoBooth() {
               </div>
 
               <div className="relative mt-1.5 sm:mt-2 rounded-sm bg-gradient-to-r from-pink via-rose to-pink px-3 sm:px-4 py-2 sm:py-2.5 text-center">
-                <p className="font-caveat text-xs sm:text-sm md:text-base text-cream italic">hi there, im just finished my cemploo</p>
+                <p className="font-caveat text-xs sm:text-sm md:text-base text-cream italic">
+                  hi there, im just finished my cemploo
+                </p>
               </div>
             </div>
 
@@ -416,7 +580,10 @@ export default function PhotoBooth() {
                 >
                   ⬇ Download Strip (9:16)
                 </button>
-                <button onClick={reset} className="w-full py-3 sm:py-3.5 rounded-full border-2 border-ink/20 text-ink/60 font-semibold text-sm sm:text-xs tracking-widest uppercase hover:border-ink/40 transition active:scale-[0.98]">
+                <button
+                  onClick={reset}
+                  className="w-full py-3 sm:py-3.5 rounded-full border-2 border-ink/20 text-ink/60 font-semibold text-sm sm:text-xs tracking-widest uppercase hover:border-ink/40 transition active:scale-[0.98]"
+                >
                   Reset
                 </button>
               </>
@@ -434,8 +601,14 @@ export default function PhotoBooth() {
           </div>
         </motion.div>
 
-        {/* RIGHT: STRIP PREVIEW — 3:4 portrait cards */}
-        <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }} className="md:col-span-5 w-full">
+        {/* RIGHT: STRIP PREVIEW */}
+        <motion.div
+          initial={{ opacity: 0, x: 30 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          className="md:col-span-5 w-full"
+        >
           <div className="relative max-w-[320px] mx-auto">
             <div className="absolute inset-0 rounded-md rotate-1 translate-x-1.5 translate-y-1.5 bg-gradient-to-br from-rose via-pink to-lavender" />
 
@@ -443,7 +616,6 @@ export default function PhotoBooth() {
               <div className="absolute inset-1 rounded-sm border-2 border-rose/30 pointer-events-none" />
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 sm:w-20 h-3.5 sm:h-4 bg-gold/70 rounded-sm rotate-[-3deg] shadow-md z-10" />
 
-              {/* Preview — 9:16 with narrow 3:4 cards centered */}
               <div className="relative aspect-[9/16] bg-cream rounded-sm overflow-hidden border-2 border-ink/30">
                 {[0, 1, 2].map((i) => (
                   <div
@@ -456,14 +628,28 @@ export default function PhotoBooth() {
                       aspectRatio: "3 / 4",
                     }}
                   >
-                    {photos[i] ? <img src={photos[i]} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <span className="text-ink/30 text-base select-none">📷</span>}
+                    {photos[i] ? (
+                      <img
+                        src={photos[i]}
+                        alt={`#${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-ink/30 text-base select-none">📷</span>
+                    )}
                   </div>
                 ))}
 
-                {/* Signature */}
-                <div className="absolute left-0 right-0 text-center" style={{ top: "93.5%" }}>
-                  <p className="font-caveat text-[6px] text-deep-rose italic leading-tight">hi there, im just finished my cemploo</p>
-                  <p className="font-caveat text-[5px] text-rose/60 leading-tight">-cinti-</p>
+                <div
+                  className="absolute left-0 right-0 text-center"
+                  style={{ top: "93.5%" }}
+                >
+                  <p className="font-caveat text-[6px] text-deep-rose italic leading-tight">
+                    hi there, im just finished my cemploo
+                  </p>
+                  <p className="font-caveat text-[5px] text-rose/60 leading-tight">
+                    -cinti-
+                  </p>
                 </div>
               </div>
             </div>
@@ -475,16 +661,14 @@ export default function PhotoBooth() {
           </div>
 
           <div className="mt-5 sm:mt-6 max-w-[420px] mx-auto paper rounded-md p-4 border border-rose/20">
-            <p className="font-caveat text-xs text-ink/50 uppercase tracking-wider mb-2">Cara pakai</p>
+            <p className="font-caveat text-xs text-ink/50 uppercase tracking-wider mb-2">
+              Cara pakai
+            </p>
             <ul className="space-y-1.5 text-[11px] sm:text-xs text-ink/70 font-caveat">
               <li>• Klik "Aktifin Kamera" → izinin akses kamera</li>
               <li>• Klik "Mulai Foto" → countdown 3× berturut-turut</li>
-              <li>
-                • Foto <strong>3:4 portrait</strong> — pas buat selfie
-              </li>
-              <li>
-                • Download strip <strong>1080×1920 (9:16 portrait)</strong>
-              </li>
+              <li>• Foto <strong>3:4 portrait</strong> — pas buat selfie</li>
+              <li>• Download strip <strong>1080×1920 (9:16 portrait)</strong></li>
               <li>• Foto selfie-style (mirror, sesuai yang kamu lihat)</li>
             </ul>
           </div>
