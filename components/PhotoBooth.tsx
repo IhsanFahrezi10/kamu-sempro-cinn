@@ -71,7 +71,13 @@ export default function PhotoBooth() {
     const sx = (vw - minDim) / 2;
     const sy = (vh - minDim) / 2;
 
+    // ✅ MIRROR output biar match selfie view (kayak preview di HP)
+    ctx.save();
+    ctx.translate(size, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, size, size);
+    ctx.restore();
+
     return canvas.toDataURL("image/jpeg", 0.9);
   };
 
@@ -139,13 +145,13 @@ export default function PhotoBooth() {
       const H = 1920;
       const PAD_TOP = 40;
       const PAD_SIDE = 80;
-      const CARD_W = W - PAD_SIDE * 2; // 920
+      const CARD_W = W - PAD_SIDE * 2;
       const CARD_H = 560;
       const CARD_X = PAD_SIDE;
       const GAP = 10;
       const PHOTO_PAD = 16;
-      const PHOTO_W = CARD_W - PHOTO_PAD * 2; // 888
-      const PHOTO_H = CARD_H - PHOTO_PAD * 2; // 528
+      const PHOTO_W = CARD_W - PHOTO_PAD * 2;
+      const PHOTO_H = CARD_H - PHOTO_PAD * 2;
 
       const canvas = document.createElement("canvas");
       canvas.width = W;
@@ -153,14 +159,12 @@ export default function PhotoBooth() {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Background gradient
       const bg = ctx.createLinearGradient(0, 0, 0, H);
       bg.addColorStop(0, "#FFF9F3");
       bg.addColorStop(1, "#FFE5EC");
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
-      // Outer borders
       const border = ctx.createLinearGradient(0, 0, W, H);
       border.addColorStop(0, "#FF8FAB");
       border.addColorStop(0.5, "#C73E68");
@@ -173,7 +177,6 @@ export default function PhotoBooth() {
       ctx.lineWidth = 2;
       ctx.strokeRect(20, 20, W - 40, H - 40);
 
-      // Corner emojis
       ctx.font = "32px serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -182,29 +185,23 @@ export default function PhotoBooth() {
       ctx.fillText("💖", 42, H - 42);
       ctx.fillText("🌷", W - 42, H - 42);
 
-      // 3 polaroids stacked — more square, tighter gaps
       for (let i = 0; i < 3; i++) {
         const cy = PAD_TOP + i * (CARD_H + GAP);
 
-        // Shadow
         ctx.fillStyle = "rgba(74, 46, 58, 0.12)";
         ctx.fillRect(CARD_X + 3, cy + 3, CARD_W, CARD_H);
 
-        // Card cream
         ctx.fillStyle = "#FFF9F3";
         ctx.fillRect(CARD_X, cy, CARD_W, CARD_H);
 
-        // Photo
         drawCover(ctx, imgs[i], CARD_X + PHOTO_PAD, cy + PHOTO_PAD, PHOTO_W, PHOTO_H);
 
-        // Photo border
         ctx.strokeStyle = "#4A2E3A";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(CARD_X + PHOTO_PAD, cy + PHOTO_PAD, PHOTO_W, PHOTO_H);
       }
 
-      // Compact signature section
-      const lastCardEnd = PAD_TOP + 3 * CARD_H + 2 * GAP; // 40 + 1680 + 20 = 1740
+      const lastCardEnd = PAD_TOP + 3 * CARD_H + 2 * GAP;
       const sigY = lastCardEnd + 55;
 
       ctx.fillStyle = "#C73E68";
@@ -217,7 +214,6 @@ export default function PhotoBooth() {
       ctx.font = "italic 24px Georgia, serif";
       ctx.fillText("-cinti-", W / 2, sigY + 42);
 
-      // Tiny dots
       ctx.fillStyle = "#FFC1D5";
       for (let i = 0; i < 5; i++) {
         ctx.beginPath();
@@ -276,10 +272,10 @@ export default function PhotoBooth() {
 
             <div className="relative paper rounded-md p-2 shadow-2xl border-2 border-gold/60 sm:p-2.5">
               <div className="absolute inset-1 rounded-sm border-2 border-rose/40 pointer-events-none z-10" />
-
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 sm:w-24 h-4 sm:h-5 bg-gold/70 rounded-sm rotate-[-3deg] shadow-md z-20" />
 
               <div className="relative aspect-square rounded-sm overflow-hidden bg-ink">
+                {/* Video preview — mirror biar sesuai selfie camera */}
                 <video
                   ref={videoRef}
                   autoPlay
@@ -288,6 +284,7 @@ export default function PhotoBooth() {
                   className="absolute inset-0 w-full h-full object-cover"
                   style={{
                     opacity: status === "ready" || status === "capturing" ? 1 : 0,
+                    transform: "scaleX(-1)",
                   }}
                 />
 
@@ -411,7 +408,7 @@ export default function PhotoBooth() {
           </div>
         </motion.div>
 
-        {/* RIGHT: STRIP PREVIEW (9:16 portrait, more square, tighter gap) */}
+        {/* RIGHT: STRIP PREVIEW — GRID explicit rows, no cut off */}
         <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }} className="md:col-span-5 w-full">
           <div className="relative max-w-[320px] mx-auto">
             <div className="absolute inset-0 rounded-md rotate-1 translate-x-1.5 translate-y-1.5 bg-gradient-to-br from-rose via-pink to-lavender" />
@@ -420,19 +417,15 @@ export default function PhotoBooth() {
               <div className="absolute inset-1 rounded-sm border-2 border-rose/30 pointer-events-none" />
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 sm:w-20 h-3.5 sm:h-4 bg-gold/70 rounded-sm rotate-[-3deg] shadow-md z-10" />
 
-              {/* Preview — 9:16 portrait, wider frames, tight gap, small signature */}
+              {/* GRID preview — 4 rows: 3 photos + signature */}
               <div className="relative aspect-[9/16] bg-cream rounded-sm overflow-hidden border-2 border-ink/30">
-                <div className="absolute inset-1.5 flex flex-col gap-0.5">
-                  {/* 3 photos — tight gap */}
-                  <div className="flex-1 flex flex-col gap-0.5">
-                    {[0, 1, 2].map((i) => (
-                      <div key={i} className="flex-1 bg-blush rounded-sm overflow-hidden relative flex items-center justify-center">
-                        {photos[i] ? <img src={photos[i]} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <span className="text-base text-ink/30">📷</span>}
-                      </div>
-                    ))}
-                  </div>
-                  {/* Tiny signature block */}
-                  <div className="shrink-0 text-center pt-1 pb-0.5">
+                <div className="absolute inset-1.5 grid grid-rows-[1fr_1fr_1fr_auto] gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="bg-blush rounded-sm overflow-hidden relative flex items-center justify-center min-h-0">
+                      {photos[i] ? <img src={photos[i]} alt={`#${i + 1}`} className="w-full h-full object-cover" /> : <span className="text-sm text-ink/30 select-none">📷</span>}
+                    </div>
+                  ))}
+                  <div className="text-center pt-0.5 pb-0.5">
                     <p className="font-caveat text-[7px] text-deep-rose italic leading-tight">hi there, im just finished my cemploo</p>
                     <p className="font-caveat text-[6px] text-rose/60 leading-tight">-cinti-</p>
                   </div>
@@ -454,8 +447,8 @@ export default function PhotoBooth() {
               <li>
                 • Download strip <strong>1080×1920 (9:16 portrait)</strong>
               </li>
+              <li>• Foto selfie-style (mirror, sesuai yang kamu lihat)</li>
               <li>• Pas untuk IG Story, WhatsApp Status, TikTok</li>
-              <li>• Foto sesuai kamera — nggak di-mirror</li>
             </ul>
           </div>
 
